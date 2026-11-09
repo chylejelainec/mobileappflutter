@@ -1,9 +1,17 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class CreateStudentPage extends StatefulWidget {
-  const CreateStudentPage({super.key});
+  final String? documentId;
+  final Map<String, dynamic>? initialData;
+
+  const CreateStudentPage({
+    super.key,
+    this.documentId,
+    this.initialData,
+  });
 
   @override
   State<CreateStudentPage> createState() => _CreateStudentPageState();
@@ -16,6 +24,20 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
 
   bool loading = false;
 
+  bool get isEditing => widget.documentId != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final data = widget.initialData ?? {};
+
+    nameController.text = data['name']?.toString() ?? '';
+    courseController.text = data['course']?.toString() ?? '';
+    studentNumberController.text =
+        data['studentNumber']?.toString() ?? '';
+  }
+
   Future<void> saveStudent() async {
     final name = nameController.text.trim();
     final course = courseController.text.trim();
@@ -23,7 +45,18 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
 
     if (name.isEmpty || course.isEmpty || studentNumber.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fill in all fields.')),
+        const SnackBar(content: Text('Fill in all fields.'),
+        backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please login first.'),
+        backgroundColor: Colors.red,),
       );
       return;
     }
@@ -31,19 +64,45 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
     setState(() => loading = true);
 
     try {
-      await FirebaseFirestore.instance.collection('students').add({
+      final collection =
+          FirebaseFirestore.instance.collection('students');
+
+      final data = <String, dynamic>{
         'name': name,
         'course': course,
         'studentNumber': studentNumber,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+        'ownerUid': user.uid,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+
+      if (isEditing) {
+        await collection.doc(widget.documentId).update(data);
+      } else {
+        await collection.add({
+          ...data,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
 
       if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEditing
+                ? 'Student updated successfully!'
+                : 'Student saved successfully!',
+          ),
+        ),
+      );
+
       Navigator.pop(context);
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save: $e')),
+        SnackBar(content: Text('Failed to save: $e'),
+        backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => loading = false);
@@ -63,10 +122,25 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
     const blue = Color(0xFF1976D2);
     const darkText = Color(0xFF172B4D);
     const secondaryText = Color(0xFF64748B);
+    const courses = <String>[
+      'BS Information Technology',
+      'BS Computer Science',
+      'BS Business Administration',
+      'BS Hospitality Management',
+      'BS Tourism Management',
+      'BS Criminology',
+    ];
+
+    // Keep an existing course available when editing older student records.
+    final courseOptions = [...courses];
+    final savedCourse = courseController.text.trim();
+    if (savedCourse.isNotEmpty && !courseOptions.contains(savedCourse)) {
+      courseOptions.insert(0, savedCourse);
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add Student'),
+        title: Text(isEditing ? 'Edit Student' : 'Add Student'),
         leading: IconButton(
           tooltip: 'Go back',
           onPressed: () => Navigator.maybePop(context),
@@ -89,31 +163,40 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
                       color: const Color(0xFFE5F1FF),
                       borderRadius: BorderRadius.circular(18),
                     ),
-                    child: const Icon(
-                      Icons.person_add_alt_1_rounded,
+                    child: Icon(
+                      isEditing
+                          ? Icons.edit_rounded
+                          : Icons.person_add_alt_1_rounded,
                       color: blue,
                       size: 30,
                     ),
                   ),
+
                   const SizedBox(height: 22),
-                  const Text(
-                    'New student',
-                    style: TextStyle(
+
+                  Text(
+                    isEditing ? 'Update student' : 'New student',
+                    style: const TextStyle(
                       fontSize: 27,
                       fontWeight: FontWeight.w800,
                       color: darkText,
                       letterSpacing: -0.5,
                     ),
                   ),
+
                   const SizedBox(height: 8),
-                  const Text(
-                    'Enter the student details below to create a record.',
-                    style: TextStyle(
+
+                  Text(
+                    isEditing
+                        ? 'Update the student information below.'
+                        : 'Enter the student details below to create a record.',
+                    style: const TextStyle(
                       color: secondaryText,
                       fontSize: 14,
                       height: 1.5,
                     ),
                   ),
+
                   const SizedBox(height: 28),
 
                   Container(
@@ -136,6 +219,7 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
                             color: darkText,
                           ),
                         ),
+
                         const SizedBox(height: 22),
 
                         const Text(
@@ -146,13 +230,16 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
                             color: darkText,
                           ),
                         ),
+
                         const SizedBox(height: 9),
+
                         TextField(
                           controller: nameController,
                           textCapitalization: TextCapitalization.words,
                           decoration: const InputDecoration(
                             hintText: 'Enter full name',
-                            prefixIcon: Icon(Icons.person_outline_rounded),
+                            prefixIcon:
+                                Icon(Icons.person_outline_rounded),
                           ),
                         ),
 
@@ -166,7 +253,9 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
                             color: darkText,
                           ),
                         ),
+
                         const SizedBox(height: 9),
+
                         TextField(
                           controller: studentNumberController,
                           decoration: const InputDecoration(
@@ -185,14 +274,27 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
                             color: darkText,
                           ),
                         ),
+
                         const SizedBox(height: 9),
-                        TextField(
-                          controller: courseController,
-                          textCapitalization: TextCapitalization.words,
+
+                        DropdownButtonFormField<String>(
+                          initialValue: courseController.text.isEmpty
+                              ? null
+                              : courseController.text,
+                          isExpanded: true,
                           decoration: const InputDecoration(
-                            hintText: 'e.g., BS Tourism Management',
+                            hintText: 'Select course',
                             prefixIcon: Icon(Icons.school_outlined),
                           ),
+                          items: courseOptions.map((course) {
+                            return DropdownMenuItem<String>(
+                              value: course,
+                              child: Text(course),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            courseController.text = value ?? '';
+                          },
                         ),
 
                         const SizedBox(height: 28),
@@ -210,12 +312,20 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                : Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.save_outlined, size: 20),
-                                      SizedBox(width: 9),
-                                      Text('Save Student'),
+                                      const Icon(
+                                        Icons.save_outlined,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 9),
+                                      Text(
+                                        isEditing
+                                            ? 'Update Student'
+                                            : 'Save Student',
+                                      ),
                                     ],
                                   ),
                           ),
@@ -223,7 +333,9 @@ class _CreateStudentPageState extends State<CreateStudentPage> {
                       ],
                     ),
                   ),
+
                   const SizedBox(height: 18),
+
                   const Center(
                     child: Text(
                       'Please ensure all information is correct.',

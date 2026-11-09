@@ -1,5 +1,5 @@
-
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'create_student.dart';
 
@@ -11,7 +11,12 @@ class StudentPage extends StatefulWidget {
 }
 
 class _StudentPageState extends State<StudentPage> {
-  final students = FirebaseFirestore.instance.collection('students');
+  final students = FirebaseFirestore.instance
+    .collection('students')
+    .where(
+      'ownerUid',
+      isEqualTo: FirebaseAuth.instance.currentUser!.uid,
+    );
 
   String initials(String name) {
     final words = name.trim().split(RegExp(r'\s+'));
@@ -346,61 +351,87 @@ class _StudentPageState extends State<StudentPage> {
                               ),
                             ),
 
-                            IconButton(
-                              tooltip: 'Delete student',
-                              visualDensity: VisualDensity.compact,
-                              icon: const Icon(
-                                Icons.delete_outline_rounded,
-                                color: Color(0xFF94A3B8),
-                                size: 22,
-                              ),
-                              onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    icon: const Icon(
-                                      Icons.delete_outline_rounded,
-                                      color: Color(0xFFDC5353),
-                                      size: 32,
-                                    ),
-                                    title: const Text('Delete Student?'),
-                                    content: Text(
-                                      'Are you sure you want to delete $name?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(context, true),
-                                        style: TextButton.styleFrom(
-                                          foregroundColor:
-                                              const Color(0xFFDC5353),
-                                        ),
-                                        child: const Text('Delete'),
-                                      ),
-                                    ],
-                                  ),
-                                );
+                            Row(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    IconButton(
+      tooltip: 'Edit student',
+      visualDensity: VisualDensity.compact,
+      icon: const Icon(
+        Icons.edit_outlined,
+        color: Color(0xFF1976D2),
+        size: 21,
+      ),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CreateStudentPage(
+              documentId: doc.id,
+              initialData: data,
+            ),
+          ),
+        );
+      },
+    ),
 
-                                if (confirm == true) {
-                                  try {
-                                    await doc.reference.delete();
-                                  } catch (e) {
-                                    if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Error: $e')),
-                                    );
-                                  }
-                                }
-                              },
-                            ),
+    IconButton(
+      tooltip: 'Delete student',
+      visualDensity: VisualDensity.compact,
+      icon: const Icon(
+        Icons.delete_outline_rounded,
+        color: Color(0xFF94A3B8),
+        size: 22,
+      ),
+      onPressed: () async {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: Color(0xFFDC5353),
+              size: 32,
+            ),
+            title: const Text('Delete Student?'),
+            content: Text(
+              'Are you sure you want to delete $name?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () =>
+                    Navigator.pop(context, true),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFDC5353),
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+
+        if (confirm == true) {
+          try {
+            await doc.reference.delete();
+          } catch (e) {
+            if (!context.mounted) return;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: $e')),
+            );
+          }
+        }
+      },
+    ),
+  ],
+),
                           ],
                         ),
 

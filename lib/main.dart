@@ -1,8 +1,7 @@
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_firebase/student_page.dart';
 import 'firebase_options.dart';
+import 'pages/login_page.dart';
 
 const Color primaryBlue = Color(0xFF1976D2);
 const Color accentBlue = Color(0xFF08A9D6);
@@ -154,7 +153,7 @@ class FirebaseHomePage extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const StudentPage(),
+                          builder: (_) => const LoginPage(),
                         ),
                       );
                     },
